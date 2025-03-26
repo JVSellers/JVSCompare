@@ -25,8 +25,15 @@ def get_amazon_info(url):
     return title, img
 
 # Función para obtener resultados desde búsqueda por imagen en Alibaba
+from urllib.parse import quote
+
 def get_alibaba_results_from_image(img_url):
+    if not isinstance(img_url, str):
+        img_url = img_url.decode('utf-8') if isinstance(img_url, bytes) else str(img_url)
+    
     search_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(img_url)}&tab=all"
+    # ... rest of your code
+
     headers = {"User-Agent": "Mozilla/5.0"}
     res = requests.get(search_url, headers=headers)
     soup = BeautifulSoup(res.content, "html.parser")
