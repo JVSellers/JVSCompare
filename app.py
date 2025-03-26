@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
+from urllib.parse import quote
 
-st.set_page_config(page_title="Comparador de productos JVSellersCompany")
-st.title("🛍️ Comparador de productos JVSellersCompany")
+st.set_page_config(page_title="Comparador por imagen - JVSellersCompany")
+st.title("🖼️ Comparador por imagen - JVSellersCompany")
 
 # Función para obtener datos de Amazon
 def get_amazon_info(url):
@@ -18,79 +18,65 @@ def get_amazon_info(url):
         title = "No encontrado"
 
     try:
-        price = soup.find("span", class_="a-price-whole").get_text().strip()
-    except:
-        price = "No disponible"
-
-    try:
         img = soup.find("img", id="landingImage")["src"]
     except:
         img = None
 
-    return title, price, img
+    return title, img
 
-# Función para buscar en Alibaba
-def search_alibaba(product_name):
-    with DDGS() as ddgs:
-        results = ddgs.text(product_name + " site:alibaba.com", max_results=3)
-        for r in results:
-            if "alibaba.com" in r["href"]:
-                return r["href"]
-    return None
-
-# Función para obtener info de Alibaba
-def get_alibaba_info(url):
+# Función para obtener resultados desde búsqueda por imagen en Alibaba
+def get_alibaba_results_from_image(img_url):
+    search_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(img_url)}&tab=all"
     headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(url, headers=headers)
+    res = requests.get(search_url, headers=headers)
     soup = BeautifulSoup(res.content, "html.parser")
 
-    try:
-        title = soup.find("h1").get_text().strip()
-    except:
-        title = "No encontrado"
-
-    try:
-        price = soup.find("span", class_="price").get_text().strip()
-    except:
-        price = "No disponible"
-
-    try:
-        img = soup.find("img")["src"]
-        if not img.startswith("http"):
-            img = "https:" + img
-    except:
-        img = None
-
-    try:
-        moq = soup.find(text=lambda t: "MOQ" in t).strip()
-    except:
-        moq = "No especificado"
-
-    return title, price, moq, img
+    results = []
+    for item in soup.select(".seb-supplier-card"):
+        try:
+            name = item.select_one(".title").get_text(strip=True)
+            price = item.select_one(".price").get_text(strip=True)
+            moq = item.select_one(".moq").get_text(strip=True)
+            link = "https:" + item.select_one("a")["href"]
+            image_tag = item.select_one("img")
+            img = image_tag["src"] if image_tag and "src" in image_tag.attrs else None
+            if img and not img.startswith("http"):
+                img = "https:" + img
+            results.append({
+                "name": name,
+                "price": price,
+                "moq": moq,
+                "link": link,
+                "img": img
+            })
+        except:
+            continue
+    return search_url, results
 
 # Interfaz de usuario
 amazon_url = st.text_input("Pega aquí el enlace del producto de Amazon")
 
 if amazon_url:
-    with st.spinner("Obteniendo datos de Amazon..."):
-        a_title, a_price, a_img = get_amazon_info(amazon_url)
-        st.subheader("🛍️ Amazon")
-        st.write(f"**Nombre:** {a_title}")
-        st.write(f"**Precio:** {a_price}")
-        if a_img:
-            st.image(a_img, width=250)
+    with st.spinner("Obteniendo imagen del producto de Amazon..."):
+        title, img_url = get_amazon_info(amazon_url)
+        st.subheader("🛍️ Producto en Amazon")
+        st.write(f"**Nombre:** {title}")
+        if img_url:
+            st.image(img_url, width=250)
         st.write(f"[Ver en Amazon]({amazon_url})")
 
-    with st.spinner("Buscando en Alibaba..."):
-        ali_url = search_alibaba(a_title)
-        if ali_url:
-            ali_title, ali_price, ali_moq, ali_img = get_alibaba_info(ali_url)
-            st.subheader("🌍 Alibaba")
-            st.write(f"**Nombre:** {ali_title}")
-            st.write(f"**Precio:** {ali_price}")
-            st.write(f"**MOQ:** {ali_moq}")
-            if ali_img:
-                st.image(ali_img, width=250)
-            st.write(f"[Ver en Alibaba]({ali_url})")
+    with st.spinner("Buscando productos similares en Alibaba por imagen..."):
+        alibaba_url, results = get_alibaba_results_from_image(img_url)
+        if results:
+            st.subheader("🌍 Resultados en Alibaba")
+            st.write(f"[Ver búsqueda completa en Alibaba]({alibaba_url})")
+            for r in results:
+                st.markdown("---")
+                st.write(f"**Nombre:** {r['name']}")
+                st.write(f"**Precio:** {r['price']}")
+                st.write(f"**MOQ:** {r['moq']}")
+                if r["img"]:
+                    st.image(r["img"], width=200)
+                st.write(f"[Ver producto]({r['link']})")
         else:
-            st.warning("No se encontró el producto en Alibaba.")
+            st.warning("No se encontraron resultados con la imagen.")
