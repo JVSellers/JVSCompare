@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from urllib.parse import quote, urlencode
@@ -51,6 +50,32 @@ def precio_alibaba_ficticio(query):
 if query:
     st.subheader(f"🔍 Resultados para: {query}")
 
+    # Simulaciones
+    precio_amz = precio_amazon_ficticio(query)
+    precio_ali, moq = precio_alibaba_ficticio(query)
+    comision = precio_amz * comision_amazon / 100
+    coste_total = precio_ali + precio_envio + comision
+    margen = precio_amz - coste_total
+    rentabilidad = (margen / coste_total) * 100 if coste_total > 0 else 0
+
+    st.write(f"💰 Precio estimado en Amazon: {precio_amz} €")
+    st.write(f"💰 Precio estimado en Alibaba: {precio_ali} € (MOQ: {moq})")
+    st.write(f"📦 Comisión Amazon: {comision:.2f} €")
+    st.write(f"📟 Coste total estimado: {coste_total:.2f} €")
+    st.write(f"📈 Margen estimado: {margen:.2f} € ({rentabilidad:.1f}%)")
+
+    if st.button("➕ Añadir al estudio"):
+        st.session_state.comparaciones.append({
+            "Producto": query,
+            "Precio Amazon (€)": precio_amz,
+            "Precio Alibaba (€)": precio_ali,
+            "MOQ": moq,
+            "Precio Envío (€)": precio_envio,
+            "Comisión Amazon (€)": round(comision, 2),
+            "Margen (€)": round(margen, 2),
+            "Rentabilidad (%)": round(rentabilidad, 1)
+        })
+
     amazon_url = f"https://www.amazon.es/s?k={quote(query)}"
     alibaba_url = f"https://www.alibaba.com/trade/search?SearchText={quote(query)}"
 
@@ -67,34 +92,6 @@ if query:
         st.image(amazon_img, use_container_width=True)
         st.markdown(f"[🔗 Ver en Amazon]({amazon_url})", unsafe_allow_html=True)
 
-    st.markdown("---")
-
-    # Simulaciones
-    precio_amz = precio_amazon_ficticio(query)
-    precio_ali, moq = precio_alibaba_ficticio(query)
-    comision = precio_amz * comision_amazon / 100
-    coste_total = precio_ali + precio_envio + comision
-    margen = precio_amz - coste_total
-    rentabilidad = (margen / coste_total) * 100 if coste_total > 0 else 0
-
-    st.write(f"💰 Precio estimado en Amazon: {precio_amz} €")
-    st.write(f"💰 Precio estimado en Alibaba: {precio_ali} € (MOQ: {moq})")
-    st.write(f"📦 Comisión Amazon: {comision:.2f} €")
-    st.write(f"🧾 Coste total estimado: {coste_total:.2f} €")
-    st.write(f"📈 Margen estimado: {margen:.2f} € ({rentabilidad:.1f}%)")
-
-    if st.button("➕ Añadir al estudio"):
-        st.session_state.comparaciones.append({
-            "Producto": query,
-            "Precio Amazon (€)": precio_amz,
-            "Precio Alibaba (€)": precio_ali,
-            "MOQ": moq,
-            "Precio Envío (€)": precio_envio,
-            "Comisión Amazon (€)": round(comision, 2),
-            "Margen (€)": round(margen, 2),
-            "Rentabilidad (%)": round(rentabilidad, 1)
-        })
-
 # Mostrar tabla
 if st.session_state.comparaciones:
     df = pd.DataFrame(st.session_state.comparaciones)
@@ -106,7 +103,7 @@ if st.session_state.comparaciones:
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Comparativa")
     st.download_button(
-        label="📥 Descargar estudio en Excel",
+        label="📅 Descargar estudio en Excel",
         data=output.getvalue(),
         file_name="comparador_productos_jvsellers.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
