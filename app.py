@@ -7,16 +7,29 @@ from duckduckgo_search import DDGS
 st.set_page_config(page_title="Comparador combinado - JVSellersCompany")
 st.title("🛍️ Comparador combinado - JVSellersCompany")
 
-# Función para extraer título e imagen desde Amazon
+# Función robusta para extraer título e imagen desde Amazon
 def get_amazon_info(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    }
     try:
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.content, "html.parser")
-        title = soup.find(id="productTitle").get_text().strip()
-        img = soup.find("img", id="landingImage")["src"]
-        return title, img
-    except:
+
+        # Buscar título
+        title_tag = soup.find("span", attrs={"id": "productTitle"})
+        if not title_tag:
+            title_tag = soup.find("span", class_="a-size-large product-title-word-break")
+        title = title_tag.get_text().strip() if title_tag else None
+
+        # Buscar imagen
+        img_tag = soup.find("img", attrs={"id": "landingImage"})
+        if not img_tag:
+            img_tag = soup.find("img", class_="a-dynamic-image")
+        img_url = img_tag["src"] if img_tag and "src" in img_tag.attrs else None
+
+        return title, img_url
+    except Exception as e:
         return None, None
 
 # Función de búsqueda por texto en Alibaba usando DuckDuckGo
@@ -47,11 +60,12 @@ if amazon_url:
         title, img_url = get_amazon_info(amazon_url)
 
     if not title:
-        st.error("No se pudo obtener la información del producto.")
+        st.error("❌ No se pudo obtener la información del producto.")
     else:
         st.subheader("📦 Producto en Amazon")
         st.write(f"**Nombre:** {title}")
-        st.image(img_url, width=250)
+        if img_url:
+            st.image(img_url, width=250)
         st.write(f"[Ver en Amazon]({amazon_url})")
 
         if search_mode == "Buscar por texto (nombre)":
