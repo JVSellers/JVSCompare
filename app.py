@@ -1,63 +1,59 @@
 import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 from urllib.parse import quote
-
-SERPAPI_KEY = "b3696f2408535b9283c37b7755c7831166ce40ed9fadce67839da07cbe913d78"
 
 st.set_page_config(page_title="Comparador JVSellersCompany")
 st.image("logo.jpeg", width=250)
 st.title("Comparador de productos JVSellersCompany")
 
-query = st.text_input("🔍 Escribe un producto para buscar en Amazon (vía Google)")
+query = st.text_input("🔍 Escribe un producto para buscar en Amazon")
 
-def is_valid_amazon_link(url):
-    return (
-        "amazon." in url and
-        "/dp/" in url or "/gp/product/" in url
-    ) and "leer.amazon" not in url
-
-def search_google_amazon(query):
-    url = "https://serpapi.com/search"
-    params = {
-        "engine": "google",
-        "q": f"{query} site:amazon.es",
-        "api_key": SERPAPI_KEY
+def search_amazon_es(query):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     }
-    res = requests.get(url, params=params)
-    data = res.json()
+    search_url = f"https://www.amazon.es/s?k={quote(query)}"
+    res = requests.get(search_url, headers=headers)
+    soup = BeautifulSoup(res.content, "html.parser")
     results = []
-    if "shopping_results" in data:
-        results.extend(data["shopping_results"])
-    if "organic_results" in data:
-        for r in data["organic_results"]:
-            link = r.get("link", "")
-            if is_valid_amazon_link(link):
-                results.append({
-                    "title": r.get("title"),
-                    "link": link,
-                    "thumbnail": r.get("thumbnail"),
-                    "price": r.get("price", {}).get("extracted_value", "N/A")
-                })
+
+    for div in soup.select("div.s-result-item[data-asin]"):
+        asin = div["data-asin"]
+        if not asin:
+            continue
+        title_tag = div.select_one("h2 span")
+        link_tag = div.select_one("h2 a")
+        image_tag = div.select_one("img")
+        price_whole = div.select_one(".a-price-whole")
+        price_frac = div.select_one(".a-price-fraction")
+
+        title = title_tag.get_text().strip() if title_tag else "Sin título"
+        link = f"https://www.amazon.es{link_tag['href']}" if link_tag else "#"
+        image = image_tag["src"] if image_tag else None
+        price = f"{price_whole.get_text()},{price_frac.get_text()} €" if price_whole and price_frac else "No disponible"
+
+        results.append({
+            "title": title,
+            "link": link,
+            "image": image,
+            "price": price
+        })
     return results
 
 if query:
     with st.spinner("Buscando productos en Amazon..."):
-        results = search_google_amazon(query)
+        results = search_amazon_es(query)
         if results:
             st.subheader(f"🔎 Resultados para: {query}")
-            for item in results:
+            for r in results:
                 st.markdown("---")
-                title = item.get("title", "Sin título")
-                link = item.get("link", "#")
-                price = item.get("price", "Precio no disponible")
-                image = item.get("thumbnail")
-
-                st.write(f"**{title}**")
-                st.write(f"💰 {price}")
-                if image:
-                    alibaba_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(image)}&tab=all"
-                    st.image(image, width=200)
+                st.write(f"**{r['title']}**")
+                st.write(f"💰 {r['price']}")
+                if r["image"]:
+                    alibaba_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(r['image'])}&tab=all"
+                    st.image(r["image"], width=200)
                     st.markdown(f"[🔎 Buscar por imagen en Alibaba]({alibaba_url})", unsafe_allow_html=True)
-                st.write(f"[Ver en Amazon]({link})")
+                st.write(f"[Ver en Amazon]({r['link']})")
         else:
             st.warning("No se encontraron productos.")
