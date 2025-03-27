@@ -1,100 +1,39 @@
+
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
+import hashlib
+import hmac
+
+PUBLISHABLE_KEY = "EOw4BiqnFHKWAtnv"
+SECRET_KEY = "150d3f30f34d487d8ba7d3af2824da85"
 
 st.set_page_config(page_title="Comparador Amazon vs Alibaba", layout="wide")
 st.image("logo.jpeg", width=250)
+st.title("")
 
-st.title("Comparador Amazon vs Alibaba")
+query = st.text_input("", placeholder="Buscar producto...", label_visibility="collapsed")
 
-# -------- Funciones --------
-def get_amazon_data(url_or_query):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    if url_or_query.startswith("http"):
-        url = url_or_query
-    else:
-        url = f"https://www.amazon.es/s?k={quote(url_or_query)}"
-
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.content, "html.parser")
-
-    if "dp/" in url:
-        title_tag = soup.find("span", id="productTitle")
-        image_tag = soup.find("img", id="landingImage")
-        price_tag = soup.find("span", class_="a-offscreen")
-        return {
-            "title": title_tag.get_text(strip=True) if title_tag else "Sin título",
-            "image": image_tag["src"] if image_tag else None,
-            "price": price_tag.get_text() if price_tag else "Sin precio",
-            "link": url
-        }
-    else:
-        first = soup.select_one("div.s-result-item[data-asin]")
-        if not first:
-            return None
-        title = first.select_one("h2 span")
-        image = first.select_one("img")
-        price = first.select_one(".a-price .a-offscreen")
-        link = first.select_one("h2 a")
-        return {
-            "title": title.get_text(strip=True) if title else "Sin título",
-            "image": image["src"] if image else None,
-            "price": price.get_text() if price else "Sin precio",
-            "link": "https://www.amazon.es" + link["href"] if link else url
-        }
-
-def search_alibaba_by_text(query):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    search_url = f"https://www.alibaba.com/trade/search?SearchText={quote(query)}"
-    res = requests.get(search_url, headers=headers)
-    soup = BeautifulSoup(res.content, "html.parser")
-
-    results = []
-    items = soup.select("div.list-no-v2-outter.J-offer-wrapper")
-    for item in items[:3]:
-        title = item.select_one(".elements-title-normal__outter a")
-        price = item.select_one(".elements-offer-price-normal__price")
-        img = item.select_one("img")
-        link = title["href"] if title and title.has_attr("href") else None
-        results.append({
-            "title": title.get_text(strip=True) if title else "Sin título",
-            "price": price.get_text(strip=True) if price else "Sin precio",
-            "image": img["src"] if img and img.has_attr("src") else None,
-            "link": link
-        })
-    return results
-
-# -------- Interfaz --------
-query = st.text_input("🔍 Pega un enlace de Amazon o escribe un producto")
+def generate_urlbox_image_url(target_url):
+    options = {
+        "url": target_url,
+        "full_page": "true",
+        "width": 1280,
+        "height": 2000,
+        "thumb_width": 600,
+        "format": "png"
+    }
+    query_string = urlencode(sorted(options.items()))
+    token = hmac.new(
+        SECRET_KEY.encode("utf-8"),
+        query_string.encode("utf-8"),
+        hashlib.sha1
+    ).hexdigest()
+    return f"https://api.urlbox.io/v1/{PUBLISHABLE_KEY}/{token}/png?{query_string}"
 
 if query:
-    col1, col2 = st.columns(2)
+    st.subheader(f"🔍 Resultados para: {query}")
 
-    with col1:
-        st.markdown("### 🛒 Amazon")
-        amazon_data = get_amazon_data(query)
-        if amazon_data:
-            st.write(f"**{amazon_data['title']}**")
-            st.image(amazon_data["image"], width=200)
-            st.write(f"💰 {amazon_data['price']}")
-            st.markdown(f"[Ver en Amazon]({amazon_data['link']})")
-        else:
-            st.warning("No se pudo obtener información de Amazon.")
-
-    with col2:
-        st.markdown("### 🌍 Alibaba")
-        results = search_alibaba_by_text(amazon_data["title"] if amazon_data else query)
-        if results:
-            for r in results:
-                st.write(f"**{r['title']}**")
-                st.image(r["image"], width=200)
-                st.write(f"💰 {r['price']}")
-                st.markdown(f"[Ver en Alibaba]({r['link']})")
-                st.markdown("---")
-        else:
-            st.warning("No se encontraron resultados en Alibaba.")
- = f"https://www.amazon.es/s?k={quote(query)}"
+    amazon_url = f"https://www.amazon.es/s?k={quote(query)}"
     alibaba_url = f"https://www.alibaba.com/trade/search?SearchText={quote(query)}"
 
     amazon_img = generate_urlbox_image_url(amazon_url)
