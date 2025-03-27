@@ -1,53 +1,33 @@
 import streamlit as st
-import requests
 from urllib.parse import quote
-from duckduckgo_search import DDGS
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Comparador JVSellersCompany", layout="wide")
 st.image("logo.jpeg", width=250)
 st.title("Comparador de productos JVSellersCompany")
 
-query = st.text_input("🔍 Escribe un producto para buscar en Amazon")
-
-def search_amazon_duckduckgo(query):
-    resultados = []
-    with DDGS() as ddgs:
-        q = f"{query} site:amazon.es"
-        search = ddgs.text(q, max_results=10)
-        for r in search:
-            if "amazon.es" in r["href"]:
-                resultados.append({
-                    "title": r["title"],
-                    "link": r["href"],
-                    "body": r["body"],
-                    "image": r.get("image", None)
-                })
-    return resultados
+query = st.text_input("🔍 Escribe un producto para comparar")
 
 if query:
-    with st.spinner("Buscando productos en Amazon..."):
-        results = search_amazon_duckduckgo(query)
-        if results:
-            st.subheader(f"🔎 Resultados para: {query}")
-            for r in results:
-                st.markdown("----")
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    if r["image"]:
-                        st.image(r["image"], width=150)
-                    else:
-                        st.markdown("*Sin imagen disponible*")
-                with col2:
-                    st.markdown(f"### {r['title']}")
-                    st.write(r["body"])
-                    st.markdown(f"[🛒 Ver en Amazon]({r['link']})", unsafe_allow_html=True)
+    amazon_url = f"https://www.amazon.es/s?k={quote(query)}"
+    alibaba_url = f"https://www.alibaba.com/trade/search?SearchText={quote(query)}"
 
-                    # Enlace a Alibaba
-                    if r["image"]:
-                        alibaba_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(r['image'])}&tab=all"
-                        st.markdown(f"[🖼️ Buscar por imagen en Alibaba]({alibaba_url})", unsafe_allow_html=True)
-                    else:
-                        alibaba_text_url = f"https://www.alibaba.com/trade/search?SearchText={quote(r['title'])}"
-                        st.markdown(f"[🔤 Buscar por texto en Alibaba]({alibaba_text_url})", unsafe_allow_html=True)
-        else:
-            st.warning("No se encontraron productos.")
+    st.subheader("🔗 Accesos rápidos")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"[🛒 Ver búsqueda en Amazon]({amazon_url})", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"[🌍 Ver búsqueda en Alibaba]({alibaba_url})", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("📊 Vista dividida (experimental)")
+    colA, colB = st.columns(2)
+
+    with colA:
+        st.markdown("### 🌍 Alibaba")
+        components.iframe(alibaba_url, height=600)
+
+    with colB:
+        st.markdown("### 🛒 Amazon")
+        components.iframe(amazon_url, height=600)
+        st.markdown(f"⚠️ Si no carga, abre [Amazon en nueva pestaña]({amazon_url})")
