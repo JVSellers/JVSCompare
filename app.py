@@ -43,10 +43,10 @@ if query:
 
     with col1:
         st.markdown("### 🌍 Alibaba")
-        st.image(alibaba_img, use_column_width=True)
+        st.image(alibaba_img, use_container_width=True)
         st.markdown(f"[🔗 Ver en Alibaba]({alibaba_url})", unsafe_allow_html=True)
 
     with col2:
         st.markdown("### 🛒 Amazon")
-        st.image(amazon_img, use_column_width=True)
+        st.image(amazon_img, use_container_width=True)
         st.markdown(f"[🔗 Ver en Amazon]({amazon_url})", unsafe_allow_html=True)
