@@ -4,9 +4,8 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Comparador JVSellersCompany", layout="wide")
 st.image("logo.jpeg", width=250)
-st.title("Comparador de productos JVSellersCompany")
 
-query = st.text_input("🔍 Escribe un producto para comparar")
+query = st.text_input("", placeholder="Buscar en Amazon y Alibaba", label_visibility="collapsed")
 
 if query:
     amazon_url = f"https://www.amazon.es/s?k={quote(query)}"
