@@ -3,7 +3,7 @@ import requests
 from urllib.parse import quote
 from duckduckgo_search import DDGS
 
-st.set_page_config(page_title="Comparador JVSellersCompany")
+st.set_page_config(page_title="Comparador JVSellersCompany", layout="wide")
 st.image("logo.jpeg", width=250)
 st.title("Comparador de productos JVSellersCompany")
 
@@ -30,13 +30,24 @@ if query:
         if results:
             st.subheader(f"🔎 Resultados para: {query}")
             for r in results:
-                st.markdown("---")
-                st.write(f"**{r['title']}**")
-                st.write(r["body"])
-                if r["image"]:
-                    st.image(r["image"], width=200)
-                    alibaba_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(r['image'])}&tab=all"
-                    st.markdown(f"[🔎 Buscar por imagen en Alibaba]({alibaba_url})", unsafe_allow_html=True)
-                st.write(f"[Ver en Amazon]({r['link']})")
+                st.markdown("----")
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if r["image"]:
+                        st.image(r["image"], width=150)
+                    else:
+                        st.markdown("*Sin imagen disponible*")
+                with col2:
+                    st.markdown(f"### {r['title']}")
+                    st.write(r["body"])
+                    st.markdown(f"[🛒 Ver en Amazon]({r['link']})", unsafe_allow_html=True)
+
+                    # Enlace a Alibaba
+                    if r["image"]:
+                        alibaba_url = f"https://www.alibaba.com/trade/search?imageUrl={quote(r['image'])}&tab=all"
+                        st.markdown(f"[🖼️ Buscar por imagen en Alibaba]({alibaba_url})", unsafe_allow_html=True)
+                    else:
+                        alibaba_text_url = f"https://www.alibaba.com/trade/search?SearchText={quote(r['title'])}"
+                        st.markdown(f"[🔤 Buscar por texto en Alibaba]({alibaba_text_url})", unsafe_allow_html=True)
         else:
             st.warning("No se encontraron productos.")
