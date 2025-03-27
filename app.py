@@ -1,6 +1,5 @@
 import streamlit as st
 from urllib.parse import quote
-import requests
 
 API_KEY = "7BFMDB6-ZTVMBK9-Q4CNZYG-8PSTBVP"
 
@@ -11,7 +10,17 @@ st.title("")
 query = st.text_input("", placeholder="Buscar producto...", label_visibility="collapsed")
 
 def get_screenshot_url(target_url):
-    return f"https://shot.screenshotapi.net/screenshot?token={API_KEY}&url={quote(target_url)}&output=image&file_type=png&wait_for_event=load&viewport=1280x800"
+    return (
+        f"https://shot.screenshotapi.net/screenshot"
+        f"?token={API_KEY}"
+        f"&url={quote(target_url)}"
+        f"&output=image"
+        f"&file_type=png"
+        f"&wait_for_event=load"
+        f"&delay=3"
+        f"&full_page=true"
+        f"&viewport=1920x2000"
+    )
 
 if query:
     amazon_url = f"https://www.amazon.es/s?k={quote(query)}"
