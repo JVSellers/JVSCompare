@@ -94,19 +94,19 @@ if uploaded_file:
 
         # Buscar el inicio real de la tabla en "Alta de productos"
         start_row_alta = 2
-        for row_data in st.session_state.temp_table.itertuples(index=False):
+        for _, row_data in st.session_state.temp_table.iterrows():
             next_row = sheet_alta.max_row + 1
             cell = sheet_alta.cell(row=next_row, column=2)
-            cell.value = row_data._asdict()["Nombre del Articulo"]
-            cell.hyperlink = row_data._asdict()["Url del producto"]
+            cell.value = row_data["Nombre del Articulo"]
+            cell.hyperlink = row_data["Url del producto"]
             cell.style = "Hyperlink"
 
         # Añadir a "calc. precio minimo intern" en la columna A y B
-        for row_data in st.session_state.temp_table.itertuples(index=False):
+        for _, row_data in st.session_state.temp_table.iterrows():
             next_row = sheet_calc.max_row + 1
             cell = sheet_calc.cell(row=next_row, column=1)
-            cell.value = row_data._asdict()["Nombre del Articulo"]
-            cell.hyperlink = row_data._asdict()["Url del producto"]
+            cell.value = row_data["Nombre del Articulo"]
+            cell.hyperlink = row_data["Url del producto"]
             cell.style = "Hyperlink"
             sheet_calc.cell(row=next_row, column=2).value = "SI"
 
