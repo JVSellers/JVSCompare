@@ -3,6 +3,7 @@ import pandas as pd
 from urllib.parse import quote
 
 st.set_page_config(page_title="Comparador Amazon vs Alibaba", layout="wide")
+st.image("logo.jpeg", width=250)
 st.title("")
 
 # Estado inicial
@@ -53,17 +54,29 @@ if query:
 
 # Mostrar tabla
 if st.session_state.comparaciones:
-    df = pd.DataFrame(st.session_state.comparaciones)
     st.subheader("📊 Comparaciones guardadas")
-    st.dataframe(df, use_container_width=True)
+    df = pd.DataFrame(st.session_state.comparaciones)
+    for idx, row in df.iterrows():
+        st.write(f"**{row['Producto']}** - Precio Amazon: {row['Precio Amazon (€)']} € | Alibaba: {row['Precio Alibaba (€)']} € | Rentabilidad: {row['Rentabilidad (%)']}%")
+        col1, _ = st.columns([1, 4])
+        if col1.button(f"🗑️ Eliminar", key=f"del_{idx}"):
+            st.session_state.comparaciones.pop(idx)
+            st.experimental_rerun()
 
-    from io import BytesIO
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Comparativa")
-    st.download_button(
-        label="📥 Descargar estudio en Excel",
-        data=output.getvalue(),
-        file_name="comparador_productos_jvsellers.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    st.markdown("---")
+    if st.button("🧹 Limpiar todos los productos"):
+        st.session_state.comparaciones.clear()
+        st.experimental_rerun()
+
+    df_final = pd.DataFrame(st.session_state.comparaciones)
+    if not df_final.empty:
+        from io import BytesIO
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_final.to_excel(writer, index=False, sheet_name="Comparativa")
+        st.download_button(
+            label="📥 Descargar estudio en Excel",
+            data=output.getvalue(),
+            file_name="comparador_productos_jvsellers.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
