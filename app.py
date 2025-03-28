@@ -31,13 +31,25 @@ def obtener_info_rainforest(asin):
     data = response.json()
     if "product" in data:
         product = data["product"]
+
+        # Extraer peso del producto
+        peso = None
+        for spec in product.get("specifications", []):
+            if "peso" in spec.get("name", "").lower():
+                peso_raw = spec.get("value", "")
+                peso_match = re.search(r"[\d,.]+", peso_raw)
+                if peso_match:
+                    peso = peso_match.group(0).replace(",", ".")
+                break
+
         return {
             "Nombre del Articulo": product.get("title", "Nombre no encontrado"),
             "ASIN": asin,
             "Precio": product.get("buybox_winner", {}).get("price", {}).get("value", "Precio no disponible"),
             "PRIMEABLE": "Sí" if product.get("is_prime") else "No",
             "Valoración": product.get("rating", "N/A"),
-            "Url del producto": product.get("link", "")
+            "Url del producto": product.get("link", ""),
+            "Peso": peso if peso else "N/A"
         }
     else:
         st.error("❌ Respuesta inesperada de la API:")
@@ -107,6 +119,11 @@ if uploaded_file:
             sheet_alta.cell(row=row_alta, column=2).value = row["Nombre del Articulo"]
             sheet_alta.cell(row=row_alta, column=2).hyperlink = row["Url del producto"]
             sheet_alta.cell(row=row_alta, column=2).style = "Hyperlink"
+            if row.get("Peso") and row["Peso"] != "N/A":
+                try:
+                    sheet_alta.cell(row=row_alta, column=7).value = float(row["Peso"])
+                except:
+                    pass
 
             clone_row(sheet_calc, row_calc)
             row_calc += 1
