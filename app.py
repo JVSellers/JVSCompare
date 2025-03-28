@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.hyperlink import Hyperlink
 
 st.set_page_config(page_title="Amazon Product Loader", layout="wide")
 st.image("logo.jpeg", width=120)
@@ -24,11 +23,10 @@ if uploaded_file:
     sheet_alta = wb["Alta de productos"]
     sheet_calc = wb["calc. precio minimo intern"]
 
-    df_alta = pd.DataFrame(sheet_alta.values)
-    df_alta.columns = df_alta.iloc[0]
-    df_alta = df_alta[1:]
-
     st.markdown("### Productos existentes:")
+    data = list(sheet_alta.values)
+    headers = data[0]
+    df_alta = pd.DataFrame(data[1:], columns=headers)
     st.dataframe(df_alta, use_container_width=True)
 
     st.markdown("---")
@@ -38,21 +36,31 @@ if uploaded_file:
     def obtener_info_amazon(url):
         headers = {"User-Agent": "Mozilla/5.0"}
         try:
-            res = requests.get(url, headers=headers)
+            res = requests.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(res.text, "html.parser")
 
-            title = soup.find(id="productTitle")
-            asin = url.split("/dp/")[1].split("/")[0] if "/dp/" in url else "N/A"
-            price = soup.find("span", {"class": "a-price-whole"})
-            prime = bool(soup.find("i", {"aria-label": "Amazon Prime"}))
-            rating = soup.find("span", {"class": "a-icon-alt"})
+            title_tag = soup.select_one("#productTitle")
+            title = title_tag.get_text(strip=True) if title_tag else "Nombre no encontrado"
+
+            price_tag = soup.select_one("span.a-price > span.a-offscreen")
+            price = price_tag.get_text(strip=True) if price_tag else "Precio no disponible"
+
+            asin = None
+            if "/dp/" in url:
+                asin = url.split("/dp/")[1].split("/")[0]
+            elif "asin=" in url:
+                asin = url.split("asin=")[1].split("&")[0]
+
+            prime = bool(soup.select_one("i[aria-label*='Prime']"))
+            rating_tag = soup.select_one("span.a-icon-alt")
+            rating = rating_tag.get_text(strip=True) if rating_tag else "N/A"
 
             return {
-                "Nombre del Articulo": title.get_text(strip=True) if title else "No encontrado",
+                "Nombre del Articulo": title,
                 "ASIN": asin,
-                "Precio": price.get_text(strip=True) if price else "No disponible",
+                "Precio": price,
                 "PRIMEABLE": "Sí" if prime else "No",
-                "Valoración": rating.get_text(strip=True) if rating else "N/A",
+                "Valoración": rating,
                 "Url del producto": url
             }
         except Exception as e:
@@ -81,19 +89,26 @@ if uploaded_file:
 
     st.markdown("---")
     if st.button("Descargar Excel actualizado"):
-        for _, row in st.session_state.temp_table.iterrows():
-            # Añadir a 'Alta de productos'
-            sheet_alta.append([
-                None, None, row.get("Nombre del Articulo"), row.get("Url del producto"),
-                None, row.get("ASIN"), None, None, None, None, None, None, None, None,
-                None, None, None, None, None, row.get("PRIMEABLE")
-            ])
+        from openpyxl.utils import get_column_letter
+        from openpyxl.cell.cell import Cell
 
-            # Añadir a 'calc. precio minimo intern'
-            last_row = sheet_calc.max_row + 1
-            sheet_calc.cell(row=last_row, column=1).value = row.get("Nombre del Articulo")
-            sheet_calc.cell(row=last_row, column=2).value = "SI"
-            sheet_calc.cell(row=last_row, column=1).hyperlink = row.get("Url del producto")
+        # Buscar el inicio real de la tabla en "Alta de productos"
+        start_row_alta = 2
+        for row_data in st.session_state.temp_table.itertuples(index=False):
+            next_row = sheet_alta.max_row + 1
+            cell = sheet_alta.cell(row=next_row, column=2)
+            cell.value = row_data._asdict()["Nombre del Articulo"]
+            cell.hyperlink = row_data._asdict()["Url del producto"]
+            cell.style = "Hyperlink"
+
+        # Añadir a "calc. precio minimo intern" en la columna A y B
+        for row_data in st.session_state.temp_table.itertuples(index=False):
+            next_row = sheet_calc.max_row + 1
+            cell = sheet_calc.cell(row=next_row, column=1)
+            cell.value = row_data._asdict()["Nombre del Articulo"]
+            cell.hyperlink = row_data._asdict()["Url del producto"]
+            cell.style = "Hyperlink"
+            sheet_calc.cell(row=next_row, column=2).value = "SI"
 
         output = BytesIO()
         wb.save(output)
