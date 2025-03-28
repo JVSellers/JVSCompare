@@ -7,6 +7,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.cell.cell import Cell
+from openpyxl.worksheet.table import Table
 from copy import copy
 
 st.set_page_config(page_title="Amazon Product Loader", layout="wide")
@@ -105,7 +106,17 @@ if uploaded_file:
                 if cell.hyperlink:
                     new_cell.hyperlink = copy(cell.hyperlink)
 
-        # Añadir a Alta de productos (con hipervínculo en el nombre)
+        # Ampliar tabla estructurada si existe
+        if sheet_alta._tables:
+            table = list(sheet_alta._tables.values())[0]
+            ref = table.ref
+            start_col_letter = ref.split(":")[0][0]
+            start_row = int(ref.split(":")[0][1:])
+            end_col_letter = ref.split(":")[1][0]
+            end_row = int(ref.split(":")[1][1:])
+            new_end_row = end_row + len(st.session_state.temp_table)
+            table.ref = f"{start_col_letter}{start_row}:{end_col_letter}{new_end_row}"
+
         last_row_alta = sheet_alta.max_row
 
         for _, row in st.session_state.temp_table.iterrows():
@@ -116,7 +127,6 @@ if uploaded_file:
             cell.hyperlink = row["Url del producto"]
             cell.style = "Hyperlink"
 
-        # Añadir a calc. precio minimo intern
         last_row_calc = sheet_calc.max_row
         for _, row in st.session_state.temp_table.iterrows():
             clone_row(sheet_calc, last_row_calc)
