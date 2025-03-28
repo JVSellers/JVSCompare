@@ -28,6 +28,7 @@ if uploaded_file:
     url = st.text_input("Pega aquí la URL del producto")
 
     def extraer_precio(soup):
+        # Buscar en los lugares más comunes primero
         selectores = [
             "span.a-price > span.a-offscreen",
             "#price_inside_buybox",
@@ -40,11 +41,15 @@ if uploaded_file:
             if tag:
                 return tag.get_text(strip=True)
 
-        # Si no encuentra en los selectores estándar, intentar con .a-price-whole y .a-price-fraction
+        # Si no se encuentra, intentar con a-price-whole y a-price-fraction
         whole = soup.select_one(".a-price-whole")
         fraction = soup.select_one(".a-price-fraction")
+        decimal = soup.select_one(".a-price-decimal")
+
         if whole and fraction:
-            return f"{whole.get_text(strip=True)}.{fraction.get_text(strip=True)}"
+            decimal_separator = "," if decimal and "," in decimal.text else "."
+            return f"{whole.text}{decimal_separator}{fraction.text}"
+
         return None
 
     def obtener_info_amazon(url):
@@ -67,9 +72,9 @@ if uploaded_file:
 
             asin = None
             if "/dp/" in url:
-                asin = url.split("/dp/")[1].split("?")[0].split("/")[0]
+                asin = url.split("/dp/")[1].split("?")[0].split("/")[0].strip("/")
             elif "asin=" in url:
-                asin = url.split("asin=")[1].split("&")[0].split("/")[0]
+                asin = url.split("asin=")[1].split("&")[0].split("/")[0].strip("/")
 
             prime = bool(soup.select_one("i[aria-label*='Prime']"))
             rating_tag = soup.select_one("span.a-icon-alt")
