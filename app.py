@@ -77,14 +77,14 @@ if uploaded_file:
                     [st.session_state.temp_table, pd.DataFrame([nuevo_producto])],
                     ignore_index=True
                 )
+                st.success("✅ Producto añadido a la tabla temporal")
             else:
                 st.error("Error al obtener información: " + nuevo_producto["Error"])
         else:
             st.warning("Por favor, introduce una URL válida.")
 
     st.markdown("### Productos añadidos en esta sesión:")
-    edited_table = st.session_state.temp_table
-    st.session_state.temp_table = edited_table
+    st.dataframe(st.session_state.temp_table, use_container_width=True)
 
     if st.button("Eliminar último producto"):
         if not st.session_state.temp_table.empty:
@@ -114,6 +114,7 @@ if uploaded_file:
                 if cell.hyperlink:
                     new_cell.hyperlink = copy(cell.hyperlink)
 
+        # Ampliar tabla si existe
         if sheet_alta._tables:
             table = list(sheet_alta._tables.values())[0]
             ref = table.ref
@@ -128,19 +129,18 @@ if uploaded_file:
         for _, row in st.session_state.temp_table.iterrows():
             clone_row(sheet_alta, last_row_alta)
             last_row_alta += 1
-            cell = sheet_alta.cell(row=last_row_alta, column=2)
-            cell.value = row["Nombre del Articulo"]
-            cell.hyperlink = row["Url del producto"]
-            cell.style = "Hyperlink"
+            sheet_alta.cell(row=last_row_alta, column=2).value = row["Nombre del Articulo"]
+            sheet_alta.cell(row=last_row_alta, column=2).hyperlink = row["Url del producto"]
+            sheet_alta.cell(row=last_row_alta, column=2).style = "Hyperlink"
+            st.success(f"Producto añadido en fila {last_row_alta} de 'Alta de productos'")
 
         last_row_calc = sheet_calc.max_row
         for _, row in st.session_state.temp_table.iterrows():
             clone_row(sheet_calc, last_row_calc)
             last_row_calc += 1
-            cell = sheet_calc.cell(row=last_row_calc, column=1)
-            cell.value = row["Nombre del Articulo"]
-            cell.hyperlink = row["Url del producto"]
-            cell.style = "Hyperlink"
+            sheet_calc.cell(row=last_row_calc, column=1).value = row["Nombre del Articulo"]
+            sheet_calc.cell(row=last_row_calc, column=1).hyperlink = row["Url del producto"]
+            sheet_calc.cell(row=last_row_calc, column=1).style = "Hyperlink"
             sheet_calc.cell(row=last_row_calc, column=2).value = "SI"
 
         output = BytesIO()
