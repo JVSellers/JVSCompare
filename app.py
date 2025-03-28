@@ -1,82 +1,100 @@
+
 import streamlit as st
 import pandas as pd
-from urllib.parse import quote
+import requests
+from bs4 import BeautifulSoup
+from io import BytesIO
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.hyperlink import Hyperlink
 
-st.set_page_config(page_title="Comparador Amazon vs Alibaba", layout="wide")
-st.image("logo.jpeg", width=250)
-st.title("")
+st.set_page_config(page_title="Amazon Product Loader", layout="wide")
+st.image("logo.jpeg", width=120)
+st.title("Amazon Product Loader - JVSellers")
 
-# Estado inicial
-if "comparaciones" not in st.session_state:
-    st.session_state.comparaciones = []
+st.markdown("### 1. Subir archivo Excel existente")
+uploaded_file = st.file_uploader("Selecciona tu archivo Excel (.xlsm)", type=["xlsm"])
 
-# Entrada
-query = st.text_input("", placeholder="Buscar producto...", label_visibility="collapsed")
-precio_envio = st.number_input("💸 Coste estimado de envío por unidad (€)", value=2.0)
-comision_amazon = st.number_input("📦 Comisión Amazon (% del precio)", value=15.0)
+if "temp_table" not in st.session_state:
+    st.session_state.temp_table = pd.DataFrame()
 
-# Simulación de precios
-def precio_amazon_ficticio(query):
-    return 25.00
+if uploaded_file:
+    bytes_data = uploaded_file.read()
+    wb = load_workbook(filename=BytesIO(bytes_data), data_only=True, keep_vba=True)
+    sheet_alta = wb["Alta de productos"]
+    sheet_calc = wb["calc. precio minimo intern"]
 
-def precio_alibaba_ficticio(query):
-    return 5.50, 100
+    df_alta = pd.DataFrame(sheet_alta.values)
+    df_alta.columns = df_alta.iloc[0]
+    df_alta = df_alta[1:]
 
-# Lógica
-if query:
-    st.subheader(f"🔍 Resultados para: {query}")
-
-    # Simulaciones
-    precio_amz = precio_amazon_ficticio(query)
-    precio_ali, moq = precio_alibaba_ficticio(query)
-    comision = precio_amz * comision_amazon / 100
-    coste_total = precio_ali + precio_envio + comision
-    margen = precio_amz - coste_total
-    rentabilidad = (margen / coste_total) * 100 if coste_total > 0 else 0
-
-    st.write(f"💰 Precio estimado en Amazon: {precio_amz} €")
-    st.write(f"💰 Precio estimado en Alibaba: {precio_ali} € (MOQ: {moq})")
-    st.write(f"📦 Comisión Amazon: {comision:.2f} €")
-    st.write(f"🧾 Coste total estimado: {coste_total:.2f} €")
-    st.write(f"📈 Margen estimado: {margen:.2f} € ({rentabilidad:.1f}%)")
-
-    if st.button("➕ Añadir al estudio"):
-        st.session_state.comparaciones.append({
-            "Producto": query,
-            "Precio Amazon (€)": precio_amz,
-            "Precio Alibaba (€)": precio_ali,
-            "MOQ": moq,
-            "Precio Envío (€)": precio_envio,
-            "Comisión Amazon (€)": round(comision, 2),
-            "Margen (€)": round(margen, 2),
-            "Rentabilidad (%)": round(rentabilidad, 1)
-        })
-
-# Mostrar tabla
-if st.session_state.comparaciones:
-    st.subheader("📊 Comparaciones guardadas")
-    df = pd.DataFrame(st.session_state.comparaciones)
-    for idx, row in df.iterrows():
-        st.write(f"**{row['Producto']}** - Precio Amazon: {row['Precio Amazon (€)']} € | Alibaba: {row['Precio Alibaba (€)']} € | Rentabilidad: {row['Rentabilidad (%)']}%")
-        col1, _ = st.columns([1, 4])
-        if col1.button(f"🗑️ Eliminar", key=f"del_{idx}"):
-            st.session_state.comparaciones.pop(idx)
-            st.experimental_rerun()
+    st.markdown("### Productos existentes:")
+    st.dataframe(df_alta, use_container_width=True)
 
     st.markdown("---")
-    if st.button("🧹 Limpiar todos los productos"):
-        st.session_state.comparaciones.clear()
-        st.experimental_rerun()
+    st.markdown("### 2. Añadir nuevo producto desde URL de Amazon")
+    url = st.text_input("Pega aquí la URL de Amazon")
 
-    df_final = pd.DataFrame(st.session_state.comparaciones)
-    if not df_final.empty:
-        from io import BytesIO
+    def obtener_info_amazon(url):
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            res = requests.get(url, headers=headers)
+            soup = BeautifulSoup(res.text, "html.parser")
+
+            title = soup.find(id="productTitle")
+            asin = url.split("/dp/")[1].split("/")[0] if "/dp/" in url else "N/A"
+            price = soup.find("span", {"class": "a-price-whole"})
+            prime = bool(soup.find("i", {"aria-label": "Amazon Prime"}))
+            rating = soup.find("span", {"class": "a-icon-alt"})
+
+            return {
+                "Nombre del Articulo": title.get_text(strip=True) if title else "No encontrado",
+                "ASIN": asin,
+                "Precio": price.get_text(strip=True) if price else "No disponible",
+                "PRIMEABLE": "Sí" if prime else "No",
+                "Valoración": rating.get_text(strip=True) if rating else "N/A",
+                "Url del producto": url
+            }
+        except Exception as e:
+            return {"Error": str(e)}
+
+    if st.button("Añadir producto"):
+        if url:
+            nuevo_producto = obtener_info_amazon(url)
+            if "Error" not in nuevo_producto:
+                st.session_state.temp_table = pd.concat(
+                    [st.session_state.temp_table, pd.DataFrame([nuevo_producto])],
+                    ignore_index=True
+                )
+            else:
+                st.error("Error al obtener información: " + nuevo_producto["Error"])
+        else:
+            st.warning("Por favor, introduce una URL válida.")
+
+    st.markdown("### Productos añadidos en esta sesión:")
+    edited_table = st.data_editor(st.session_state.temp_table, use_container_width=True, num_rows="dynamic")
+    st.session_state.temp_table = edited_table
+
+    if st.button("Eliminar último producto"):
+        if not st.session_state.temp_table.empty:
+            st.session_state.temp_table = st.session_state.temp_table.iloc[:-1]
+
+    st.markdown("---")
+    if st.button("Descargar Excel actualizado"):
+        for _, row in st.session_state.temp_table.iterrows():
+            # Añadir a 'Alta de productos'
+            sheet_alta.append([
+                None, None, row.get("Nombre del Articulo"), row.get("Url del producto"),
+                None, row.get("ASIN"), None, None, None, None, None, None, None, None,
+                None, None, None, None, None, row.get("PRIMEABLE")
+            ])
+
+            # Añadir a 'calc. precio minimo intern'
+            last_row = sheet_calc.max_row + 1
+            sheet_calc.cell(row=last_row, column=1).value = row.get("Nombre del Articulo")
+            sheet_calc.cell(row=last_row, column=2).value = "SI"
+            sheet_calc.cell(row=last_row, column=1).hyperlink = row.get("Url del producto")
+
         output = BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_final.to_excel(writer, index=False, sheet_name="Comparativa")
-        st.download_button(
-            label="📥 Descargar estudio en Excel",
-            data=output.getvalue(),
-            file_name="comparador_productos_jvsellers.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        wb.save(output)
+        st.download_button("📥 Descargar archivo Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
