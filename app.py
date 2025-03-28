@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.cell.cell import Cell
+from copy import copy
 
 st.set_page_config(page_title="Amazon Product Loader", layout="wide")
 st.image("logo.jpeg", width=120)
@@ -19,7 +21,7 @@ if "temp_table" not in st.session_state:
 
 if uploaded_file:
     bytes_data = uploaded_file.read()
-    wb = load_workbook(filename=BytesIO(bytes_data), data_only=True, keep_vba=True)
+    wb = load_workbook(filename=BytesIO(bytes_data), data_only=False, keep_vba=True)
     sheet_alta = wb["Alta de productos"]
     sheet_calc = wb["calc. precio minimo intern"]
 
@@ -47,7 +49,7 @@ if uploaded_file:
 
             asin = None
             if "/dp/" in url:
-                asin = url.split("/dp/")[1].split("/")[0]
+                asin = url.split("/dp/")[1].split("?")[0]
             elif "asin=" in url:
                 asin = url.split("asin=")[1].split("&")[0]
 
@@ -89,26 +91,41 @@ if uploaded_file:
 
     st.markdown("---")
     if st.button("Descargar Excel actualizado"):
-        from openpyxl.utils import get_column_letter
-        from openpyxl.cell.cell import Cell
 
-        # Buscar el inicio real de la tabla en "Alta de productos"
-        start_row_alta = 2
-        for _, row_data in st.session_state.temp_table.iterrows():
-            next_row = sheet_alta.max_row + 1
-            cell = sheet_alta.cell(row=next_row, column=2)
-            cell.value = row_data["Nombre del Articulo"]
-            cell.hyperlink = row_data["Url del producto"]
+        def clone_row(ws, row_idx):
+            new_idx = row_idx + 1
+            ws.insert_rows(new_idx)
+            for col_idx, cell in enumerate(ws[row_idx], start=1):
+                new_cell = ws.cell(row=new_idx, column=col_idx)
+                new_cell.value = cell.value
+                if cell.has_style:
+                    new_cell._style = copy(cell._style)
+                if cell.data_type == 'f':
+                    new_cell.value = f"={cell.value}"
+                if cell.hyperlink:
+                    new_cell.hyperlink = copy(cell.hyperlink)
+
+        # Añadir a Alta de productos (con hipervínculo en el nombre)
+        last_row_alta = sheet_alta.max_row
+
+        for _, row in st.session_state.temp_table.iterrows():
+            clone_row(sheet_alta, last_row_alta)
+            last_row_alta += 1
+            cell = sheet_alta.cell(row=last_row_alta, column=2)
+            cell.value = row["Nombre del Articulo"]
+            cell.hyperlink = row["Url del producto"]
             cell.style = "Hyperlink"
 
-        # Añadir a "calc. precio minimo intern" en la columna A y B
-        for _, row_data in st.session_state.temp_table.iterrows():
-            next_row = sheet_calc.max_row + 1
-            cell = sheet_calc.cell(row=next_row, column=1)
-            cell.value = row_data["Nombre del Articulo"]
-            cell.hyperlink = row_data["Url del producto"]
+        # Añadir a calc. precio minimo intern
+        last_row_calc = sheet_calc.max_row
+        for _, row in st.session_state.temp_table.iterrows():
+            clone_row(sheet_calc, last_row_calc)
+            last_row_calc += 1
+            cell = sheet_calc.cell(row=last_row_calc, column=1)
+            cell.value = row["Nombre del Articulo"]
+            cell.hyperlink = row["Url del producto"]
             cell.style = "Hyperlink"
-            sheet_calc.cell(row=next_row, column=2).value = "SI"
+            sheet_calc.cell(row=last_row_calc, column=2).value = "SI"
 
         output = BytesIO()
         wb.save(output)
