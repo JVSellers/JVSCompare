@@ -39,7 +39,14 @@ def obtener_info_rainforest(asin):
                 peso_raw = spec.get("value", "")
                 peso_match = re.search(r"[\d,.]+", peso_raw)
                 if peso_match:
-                    peso = peso_match.group(0).replace(",", ".")
+                    peso_valor = peso_match.group(0).replace(",", ".")
+                    try:
+                        peso_float = float(peso_valor)
+                        if "g" in peso_raw.lower():
+                            peso_float = peso_float / 1000
+                        peso = round(peso_float, 2)
+                    except:
+                        peso = None
                 break
 
         return {
@@ -49,7 +56,7 @@ def obtener_info_rainforest(asin):
             "PRIMEABLE": "Sí" if product.get("is_prime") else "No",
             "Valoración": product.get("rating", "N/A"),
             "Url del producto": product.get("link", ""),
-            "Peso": peso if peso else "N/A"
+            "Peso": peso if peso else None
         }
     else:
         st.error("❌ Respuesta inesperada de la API:")
@@ -89,16 +96,16 @@ if uploaded_file:
 
     if st.button("Descargar Excel actualizado"):
 
-        def clone_row(ws, row_idx):
-            new_idx = row_idx + 1
-            ws.insert_rows(new_idx)
-            for col_idx, cell in enumerate(ws[row_idx], start=1):
-                new_cell = ws.cell(row=new_idx, column=col_idx)
-                new_cell.value = cell.value
-                if cell.has_style:
-                    new_cell._style = copy(cell._style)
-                if cell.hyperlink:
-                    new_cell.hyperlink = copy(cell.hyperlink)
+        def insert_row_with_formula(ws, base_row_idx):
+            ws.insert_rows(base_row_idx + 1)
+            for col in range(1, ws.max_column + 1):
+                cell_above = ws.cell(row=base_row_idx, column=col)
+                cell_below = ws.cell(row=base_row_idx + 1, column=col)
+                cell_below.value = cell_above.value
+                if cell_above.has_style:
+                    cell_below._style = copy(cell_above._style)
+                if cell_above.hyperlink:
+                    cell_below.hyperlink = copy(cell_above.hyperlink)
 
         if sheet_alta._tables:
             table = list(sheet_alta._tables.values())[0]
@@ -110,29 +117,26 @@ if uploaded_file:
             new_end_row = end_row + len(st.session_state.temp_table)
             table.ref = f"{start_col_letter}{start_row}:{end_col_letter}{new_end_row}"
 
-        row_alta = sheet_alta.max_row
-        row_calc = sheet_calc.max_row
+        base_row_alta = sheet_alta.max_row
+        base_row_calc = sheet_calc.max_row
 
         for _, row in st.session_state.temp_table.iterrows():
-            clone_row(sheet_alta, row_alta)
-            row_alta += 1
-            sheet_alta.cell(row=row_alta, column=2).value = row["Nombre del Articulo"]
-            sheet_alta.cell(row=row_alta, column=2).hyperlink = row["Url del producto"]
-            sheet_alta.cell(row=row_alta, column=2).style = "Hyperlink"
-            if row.get("Peso") and row["Peso"] != "N/A":
-                try:
-                    sheet_alta.cell(row=row_alta, column=7).value = float(row["Peso"])
-                except:
-                    pass
+            insert_row_with_formula(sheet_alta, base_row_alta)
+            base_row_alta += 1
+            sheet_alta.cell(row=base_row_alta, column=2).value = row["Nombre del Articulo"]
+            sheet_alta.cell(row=base_row_alta, column=2).hyperlink = row["Url del producto"]
+            sheet_alta.cell(row=base_row_alta, column=2).style = "Hyperlink"
+            if row.get("Peso"):
+                sheet_alta.cell(row=base_row_alta, column=7).value = float(row["Peso"])
 
-            clone_row(sheet_calc, row_calc)
-            row_calc += 1
-            sheet_calc.cell(row=row_calc, column=1).value = row["Nombre del Articulo"]
-            sheet_calc.cell(row=row_calc, column=1).hyperlink = row["Url del producto"]
-            sheet_calc.cell(row=row_calc, column=1).style = "Hyperlink"
-            sheet_calc.cell(row=row_calc, column=2).value = "SI"
+            insert_row_with_formula(sheet_calc, base_row_calc)
+            base_row_calc += 1
+            sheet_calc.cell(row=base_row_calc, column=1).value = row["Nombre del Articulo"]
+            sheet_calc.cell(row=base_row_calc, column=1).hyperlink = row["Url del producto"]
+            sheet_calc.cell(row=base_row_calc, column=1).style = "Hyperlink"
+            sheet_calc.cell(row=base_row_calc, column=2).value = "SI"
             if isinstance(row["Precio"], (int, float)):
-                sheet_calc.cell(row=row_calc, column=3).value = row["Precio"]
+                sheet_calc.cell(row=base_row_calc, column=3).value = row["Precio"]
 
         output = BytesIO()
         wb.save(output)
