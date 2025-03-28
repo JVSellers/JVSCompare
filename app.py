@@ -96,12 +96,15 @@ if uploaded_file:
 
     if st.button("Descargar Excel actualizado"):
 
-        def insert_row_with_formula(ws, base_row_idx):
+        def insert_row_with_formulas(ws, base_row_idx):
             ws.insert_rows(base_row_idx + 1)
             for col in range(1, ws.max_column + 1):
                 cell_above = ws.cell(row=base_row_idx, column=col)
                 cell_below = ws.cell(row=base_row_idx + 1, column=col)
-                cell_below.value = cell_above.value
+                if cell_above.data_type == "f":
+                    cell_below.value = f"={cell_above.value}"
+                else:
+                    cell_below.value = cell_above.value
                 if cell_above.has_style:
                     cell_below._style = copy(cell_above._style)
                 if cell_above.hyperlink:
@@ -121,7 +124,7 @@ if uploaded_file:
         base_row_calc = sheet_calc.max_row
 
         for _, row in st.session_state.temp_table.iterrows():
-            insert_row_with_formula(sheet_alta, base_row_alta)
+            insert_row_with_formulas(sheet_alta, base_row_alta)
             base_row_alta += 1
             sheet_alta.cell(row=base_row_alta, column=2).value = row["Nombre del Articulo"]
             sheet_alta.cell(row=base_row_alta, column=2).hyperlink = row["Url del producto"]
@@ -129,7 +132,7 @@ if uploaded_file:
             if row.get("Peso"):
                 sheet_alta.cell(row=base_row_alta, column=7).value = float(row["Peso"])
 
-            insert_row_with_formula(sheet_calc, base_row_calc)
+            insert_row_with_formulas(sheet_calc, base_row_calc)
             base_row_calc += 1
             sheet_calc.cell(row=base_row_calc, column=1).value = row["Nombre del Articulo"]
             sheet_calc.cell(row=base_row_calc, column=1).hyperlink = row["Url del producto"]
