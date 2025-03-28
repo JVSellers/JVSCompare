@@ -1,1 +1,1 @@
-(CÓDIGO OMITIDO EN ESTA CELDA PARA BREVEDAD)
+# Código funcional de la versión v9 omitido aquí por brevedad
