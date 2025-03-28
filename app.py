@@ -14,6 +14,7 @@ st.image("logo.jpeg", width=120)
 st.title("Amazon Product Loader - JVSellers")
 
 uploaded_file = st.file_uploader("Sube tu Excel (.xlsm)", type=["xlsm"])
+mostrar_html = st.checkbox("🔍 Mostrar HTML de depuración (avanzado)")
 
 if "temp_table" not in st.session_state:
     st.session_state.temp_table = pd.DataFrame()
@@ -28,34 +29,35 @@ if uploaded_file:
     url = st.text_input("Pega aquí la URL del producto")
 
     def extraer_precio(soup):
-        # Buscar en los lugares más comunes primero
         selectores = [
             "span.a-price > span.a-offscreen",
             "#price_inside_buybox",
             "#corePriceDisplay_desktop_feature_div span.a-offscreen",
             "#priceblock_ourprice",
-            "#priceblock_dealprice"
+            "#priceblock_dealprice",
+            "[data-asin-price]"  # selector alternativo
         ]
         for selector in selectores:
             tag = soup.select_one(selector)
-            if tag:
+            if tag and tag.get_text(strip=True):
                 return tag.get_text(strip=True)
 
-        # Si no se encuentra, intentar con a-price-whole y a-price-fraction
+        # Extra de seguridad con .a-price-whole + .a-price-fraction
         whole = soup.select_one(".a-price-whole")
         fraction = soup.select_one(".a-price-fraction")
         decimal = soup.select_one(".a-price-decimal")
-
         if whole and fraction:
-            decimal_separator = "," if decimal and "," in decimal.text else "."
-            return f"{whole.text}{decimal_separator}{fraction.text}"
-
+            separator = "," if decimal and "," in decimal.text else "."
+            return f"{whole.text}{separator}{fraction.text}"
         return None
 
     def obtener_info_amazon(url):
         headers = {"User-Agent": "Mozilla/5.0"}
         try:
             res = requests.get(url, headers=headers, timeout=10)
+            if mostrar_html:
+                st.code(res.text[:5000], language="html")
+
             soup = BeautifulSoup(res.text, "html.parser")
 
             title_tag = soup.select_one("#productTitle")
@@ -70,11 +72,8 @@ if uploaded_file:
                 except:
                     price_float = None
 
-            asin = None
-            if "/dp/" in url:
-                asin = url.split("/dp/")[1].split("?")[0].split("/")[0].strip("/")
-            elif "asin=" in url:
-                asin = url.split("asin=")[1].split("&")[0].split("/")[0].strip("/")
+            asin_match = re.search(r"/dp/([A-Z0-9]{10})", url)
+            asin = asin_match.group(1) if asin_match else None
 
             prime = bool(soup.select_one("i[aria-label*='Prime']"))
             rating_tag = soup.select_one("span.a-icon-alt")
@@ -150,4 +149,4 @@ if uploaded_file:
 
         output = BytesIO()
         wb.save(output)
-        st.download_button("📥 Descargar Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
+        st.download_button("📥 Descargar archivo Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
