@@ -6,12 +6,9 @@ from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.worksheet.table import Table
 from copy import copy
-import os
-from dotenv import load_dotenv
 import re
 
-load_dotenv()
-API_KEY = os.getenv("RAINFOREST_API_KEY")
+API_KEY = "F56B9A35A52E45B4AEB21D1884B8486D"
 
 st.set_page_config(page_title="Amazon Product Loader - Rainforest API", layout="wide")
 st.image("logo.jpeg", width=120)
@@ -31,9 +28,9 @@ def obtener_info_rainforest(asin):
         "asin": asin
     }
     response = requests.get(url, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        product = data.get("product", {})
+    data = response.json()
+    if "product" in data:
+        product = data["product"]
         return {
             "Nombre del Articulo": product.get("title", "Nombre no encontrado"),
             "ASIN": asin,
@@ -43,7 +40,9 @@ def obtener_info_rainforest(asin):
             "Url del producto": product.get("link", "")
         }
     else:
-        return {"Error": f"Error en la API: {response.status_code}"}
+        st.error("❌ Respuesta inesperada de la API:")
+        st.code(data, language="json")
+        return {"Error": "Producto no encontrado o error inesperado"}
 
 def extraer_asin_desde_url(url):
     match = re.search(r"/dp/([A-Z0-9]{10})", url)
@@ -66,7 +65,7 @@ if uploaded_file:
                 st.session_state.temp_table = pd.concat([st.session_state.temp_table, pd.DataFrame([nuevo])], ignore_index=True)
                 st.success(f"Producto añadido con ASIN: {asin}")
             else:
-                st.error(nuevo["Error"])
+                st.warning("No se encontró el producto o no tiene buybox.")
         else:
             st.warning("No se pudo extraer un ASIN válido de la URL.")
 
