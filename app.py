@@ -2,22 +2,52 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.worksheet.table import Table
 from copy import copy
+import os
+from dotenv import load_dotenv
 import re
 
-st.set_page_config(page_title="Amazon Product Loader", layout="wide")
+load_dotenv()
+API_KEY = os.getenv("RAINFOREST_API_KEY")
+
+st.set_page_config(page_title="Amazon Product Loader - Rainforest API", layout="wide")
 st.image("logo.jpeg", width=120)
-st.title("Amazon Product Loader - JVSellers")
+st.title("Amazon Product Loader - JVSellers (Rainforest API)")
 
 uploaded_file = st.file_uploader("Sube tu Excel (.xlsm)", type=["xlsm"])
-mostrar_html = st.checkbox("🔍 Mostrar HTML de depuración (avanzado)")
 
 if "temp_table" not in st.session_state:
     st.session_state.temp_table = pd.DataFrame()
+
+def obtener_info_rainforest(asin):
+    url = "https://api.rainforestapi.com/request"
+    params = {
+        "api_key": API_KEY,
+        "type": "product",
+        "amazon_domain": "amazon.es",
+        "asin": asin
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        product = data.get("product", {})
+        return {
+            "Nombre del Articulo": product.get("title", "Nombre no encontrado"),
+            "ASIN": asin,
+            "Precio": product.get("buybox_winner", {}).get("price", {}).get("value", "Precio no disponible"),
+            "PRIMEABLE": "Sí" if product.get("is_prime") else "No",
+            "Valoración": product.get("rating", "N/A"),
+            "Url del producto": product.get("link", "")
+        }
+    else:
+        return {"Error": f"Error en la API: {response.status_code}"}
+
+def extraer_asin_desde_url(url):
+    match = re.search(r"/dp/([A-Z0-9]{10})", url)
+    return match.group(1) if match else None
 
 if uploaded_file:
     bytes_data = uploaded_file.read()
@@ -25,79 +55,20 @@ if uploaded_file:
     sheet_alta = wb["Alta de productos"]
     sheet_calc = wb["calc. precio minimo intern"]
 
-    st.markdown("### Añadir nuevo producto desde Amazon")
-    url = st.text_input("Pega aquí la URL del producto")
-
-    def extraer_precio(soup):
-        selectores = [
-            "span.a-price > span.a-offscreen",
-            "#price_inside_buybox",
-            "#corePriceDisplay_desktop_feature_div span.a-offscreen",
-            "#priceblock_ourprice",
-            "#priceblock_dealprice",
-            "[data-asin-price]"  # selector alternativo
-        ]
-        for selector in selectores:
-            tag = soup.select_one(selector)
-            if tag and tag.get_text(strip=True):
-                return tag.get_text(strip=True)
-
-        # Extra de seguridad con .a-price-whole + .a-price-fraction
-        whole = soup.select_one(".a-price-whole")
-        fraction = soup.select_one(".a-price-fraction")
-        decimal = soup.select_one(".a-price-decimal")
-        if whole and fraction:
-            separator = "," if decimal and "," in decimal.text else "."
-            return f"{whole.text}{separator}{fraction.text}"
-        return None
-
-    def obtener_info_amazon(url):
-        headers = {"User-Agent": "Mozilla/5.0"}
-        try:
-            res = requests.get(url, headers=headers, timeout=10)
-            if mostrar_html:
-                st.code(res.text[:5000], language="html")
-
-            soup = BeautifulSoup(res.text, "html.parser")
-
-            title_tag = soup.select_one("#productTitle")
-            title = title_tag.get_text(strip=True) if title_tag else "Nombre no encontrado"
-
-            price_text = extraer_precio(soup)
-            price_float = None
-            if price_text:
-                price_clean = price_text.replace("€", "").replace(",", ".").replace(u'\xa0', '').strip()
-                try:
-                    price_float = float(price_clean)
-                except:
-                    price_float = None
-
-            asin_match = re.search(r"/dp/([A-Z0-9]{10})", url)
-            asin = asin_match.group(1) if asin_match else None
-
-            prime = bool(soup.select_one("i[aria-label*='Prime']"))
-            rating_tag = soup.select_one("span.a-icon-alt")
-            rating = rating_tag.get_text(strip=True) if rating_tag else "N/A"
-
-            return {
-                "Nombre del Articulo": title,
-                "ASIN": asin,
-                "Precio": price_float if price_float is not None else "Precio no disponible",
-                "PRIMEABLE": "Sí" if prime else "No",
-                "Valoración": rating,
-                "Url del producto": url
-            }
-        except Exception as e:
-            return {"Error": str(e)}
+    st.markdown("### Añadir nuevo producto desde URL de Amazon")
+    url = st.text_input("Pega aquí la URL de Amazon")
 
     if st.button("Añadir producto"):
-        if url:
-            nuevo = obtener_info_amazon(url)
+        asin = extraer_asin_desde_url(url)
+        if asin:
+            nuevo = obtener_info_rainforest(asin)
             if "Error" not in nuevo:
                 st.session_state.temp_table = pd.concat([st.session_state.temp_table, pd.DataFrame([nuevo])], ignore_index=True)
-                st.success("Producto añadido a la tabla temporal")
+                st.success(f"Producto añadido con ASIN: {asin}")
             else:
-                st.error("Error: " + nuevo["Error"])
+                st.error(nuevo["Error"])
+        else:
+            st.warning("No se pudo extraer un ASIN válido de la URL.")
 
     st.dataframe(st.session_state.temp_table, use_container_width=True)
 
@@ -149,4 +120,4 @@ if uploaded_file:
 
         output = BytesIO()
         wb.save(output)
-        st.download_button("📥 Descargar archivo Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
+        st.download_button("📥 Descargar Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
