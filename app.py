@@ -141,7 +141,7 @@ if uploaded_file:
             sheet_calc.cell(row=fila, column=5).value = f"=L{fila}+I{fila}+K{fila}+N{fila}+O{fila}"  # E
             sheet_calc.cell(row=fila, column=6).value = f"=D{fila}-E{fila}"  # F
             sheet_calc.cell(row=fila, column=7).value = f"=F{fila}/D{fila}"  # G
-            sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila};'Alta de productos'!B:B;'Alta de productos'!G:G;'no hay peso';0;1);BUSCARX(A{fila};Tabla44[Nombre del Articulo];Tabla44[cubicaje m3];'No hay';0;1))"  # H
+sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila};'Alta de productos'!B:B;'Alta de productos'!G:G;'no hay peso';0;1);BUSCARX(A{fila};Tabla44[Nombre del Articulo];Tabla44[cubicaje m3];'No hay';0;1))"
             sheet_calc.cell(row=fila, column=11).value = f"=BUSCARV(A{fila};'Alta de productos'!B:R;SI($R$2=2021;12;SI($R$2=2022;13;14));FALSO)"  # K
             sheet_calc.cell(row=fila, column=12).value = f"=C{fila}*M{fila}"  # L
 
