@@ -1,4 +1,5 @@
 
+# app.py corregido con comillas escapadas en fórmula compleja
 import streamlit as st
 import pandas as pd
 import requests
@@ -138,7 +139,7 @@ if uploaded_file:
 
             sheet_calc.cell(row=fila, column=6).value = f"=D{fila}-E{fila}"
             sheet_calc.cell(row=fila, column=7).value = f"=F{fila}/D{fila}"
-            sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila},'Alta de productos'!B:B,'Alta de productos'!G:G,"no hay peso",0,1),BUSCARX(A{fila},Tabla44[Nombre del Articulo],Tabla44[cubicaje m3],"No hay",0,1))"
+            sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila},'Alta de productos'!B:B,'Alta de productos'!G:G,\"no hay peso\",0,1),BUSCARX(A{fila},Tabla44[Nombre del Articulo],Tabla44[cubicaje m3],\"No hay\",0,1))"
             sheet_calc.cell(row=fila, column=11).value = f"=SI(H{fila}=0,0,J{fila}/H{fila})"
             sheet_calc.cell(row=fila, column=12).value = f"=C{fila}*M{fila}"
 
