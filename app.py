@@ -117,9 +117,35 @@ if uploaded_file:
         base_row_alta = sheet_alta.max_row
         base_row_calc = sheet_calc.max_row
 
-        for _, row in st.session_state.temp_table.iterrows():
-        for _, row in st.session_state.temp_table.iterrows():
+            insert_row_preservando_estilo(sheet_alta, base_row_alta)
+            base_row_alta += 1
+            sheet_alta.cell(row=base_row_alta, column=2).value = row["Nombre del Articulo"]
+            sheet_alta.cell(row=base_row_alta, column=2).hyperlink = row["Url del producto"]
+            sheet_alta.cell(row=base_row_alta, column=2).style = "Hyperlink"
+            if row.get("Peso"):
+                sheet_alta.cell(row=base_row_alta, column=7).value = float(row["Peso"])
 
+            insert_row_preservando_estilo(sheet_calc, base_row_calc)
+            base_row_calc += 1
+            fila = base_row_calc
+            sheet_calc.cell(row=fila, column=1).value = row["Nombre del Articulo"]
+            sheet_calc.cell(row=fila, column=1).hyperlink = row["Url del producto"]
+            sheet_calc.cell(row=fila, column=1).style = "Hyperlink"
+            sheet_calc.cell(row=fila, column=2).value = "SI"
+            if isinstance(row["Precio"], (int, float)):
+                sheet_calc.cell(row=fila, column=3).value = row["Precio"]
+
+            # Formulas corregidas con separador ;
+            sheet_calc.cell(row=fila, column=4).value = f"=C{fila}/1,21"  # D
+            sheet_calc.cell(row=fila, column=5).value = f"=L{fila}+I{fila}+K{fila}+N{fila}+O{fila}"  # E
+            sheet_calc.cell(row=fila, column=6).value = f"=D{fila}-E{fila}"  # F
+            sheet_calc.cell(row=fila, column=7).value = f"=F{fila}/D{fila}"  # G
+sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila};'Alta de productos'!B:B;'Alta de productos'!G:G;'no hay peso';0;1);BUSCARX(A{fila};Tabla44[Nombre del Articulo];Tabla44[cubicaje m3];'No hay';0;1))"
+            sheet_calc.cell(row=fila, column=11).value = f"=BUSCARV(A{fila};'Alta de productos'!B:R;SI($R$2=2021;12;SI($R$2=2022;13;14));FALSO)"  # K
+            sheet_calc.cell(row=fila, column=12).value = f"=C{fila}*M{fila}"  # L
+
+        
+        for _, row in st.session_state.temp_table.iterrows():
             insert_row_preservando_estilo(sheet_alta, base_row_alta)
             base_row_alta += 1
             sheet_alta.cell(row=base_row_alta, column=2).value = row['Nombre del Articulo']
@@ -144,6 +170,7 @@ if uploaded_file:
             sheet_calc.cell(row=fila, column=8).value = f"=MAX(BUSCARX(A{fila};'Alta de productos'!B:B;'Alta de productos'!G:G;'no hay peso';0;1);BUSCARX(A{fila};Tabla44[Nombre del Articulo];Tabla44[cubicaje m3];'No hay';0;1))"
             sheet_calc.cell(row=fila, column=11).value = f"=BUSCARV(A{fila};'Alta de productos'!B:R;SI($R$2=2021;12;SI($R$2=2022;13;14));FALSO)"
             sheet_calc.cell(row=fila, column=12).value = f"=C{fila}*M{fila}"
+
         output = BytesIO()
         wb.save(output)
         st.download_button("📥 Descargar Excel", data=output.getvalue(), file_name="productos_actualizados.xlsm")
