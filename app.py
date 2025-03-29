@@ -31,8 +31,6 @@ def obtener_info_rainforest(asin):
     data = response.json()
     if "product" in data:
         product = data["product"]
-
-        # Extraer peso del producto
         peso = None
         for spec in product.get("specifications", []):
             if "peso" in spec.get("name", "").lower():
@@ -48,7 +46,6 @@ def obtener_info_rainforest(asin):
                     except:
                         peso = None
                 break
-
         return {
             "Nombre del Articulo": product.get("title", "Nombre no encontrado"),
             "ASIN": asin,
@@ -96,15 +93,12 @@ if uploaded_file:
 
     if st.button("Descargar Excel actualizado"):
 
-        def insert_row_with_formulas(ws, base_row_idx):
+        def insert_row_preservando_estilo(ws, base_row_idx):
             ws.insert_rows(base_row_idx + 1)
             for col in range(1, ws.max_column + 1):
                 cell_above = ws.cell(row=base_row_idx, column=col)
                 cell_below = ws.cell(row=base_row_idx + 1, column=col)
-                if cell_above.data_type == "f":
-                    cell_below.value = f"={cell_above.value}"
-                else:
-                    cell_below.value = cell_above.value
+                cell_below.value = cell_above.value
                 if cell_above.has_style:
                     cell_below._style = copy(cell_above._style)
                 if cell_above.hyperlink:
@@ -124,7 +118,7 @@ if uploaded_file:
         base_row_calc = sheet_calc.max_row
 
         for _, row in st.session_state.temp_table.iterrows():
-            insert_row_with_formulas(sheet_alta, base_row_alta)
+            insert_row_preservando_estilo(sheet_alta, base_row_alta)
             base_row_alta += 1
             sheet_alta.cell(row=base_row_alta, column=2).value = row["Nombre del Articulo"]
             sheet_alta.cell(row=base_row_alta, column=2).hyperlink = row["Url del producto"]
@@ -132,14 +126,22 @@ if uploaded_file:
             if row.get("Peso"):
                 sheet_alta.cell(row=base_row_alta, column=7).value = float(row["Peso"])
 
-            insert_row_with_formulas(sheet_calc, base_row_calc)
+            insert_row_preservando_estilo(sheet_calc, base_row_calc)
             base_row_calc += 1
-            sheet_calc.cell(row=base_row_calc, column=1).value = row["Nombre del Articulo"]
-            sheet_calc.cell(row=base_row_calc, column=1).hyperlink = row["Url del producto"]
-            sheet_calc.cell(row=base_row_calc, column=1).style = "Hyperlink"
-            sheet_calc.cell(row=base_row_calc, column=2).value = "SI"
+            fila = base_row_calc
+            sheet_calc.cell(row=fila, column=1).value = row["Nombre del Articulo"]
+            sheet_calc.cell(row=fila, column=1).hyperlink = row["Url del producto"]
+            sheet_calc.cell(row=fila, column=1).style = "Hyperlink"
+            sheet_calc.cell(row=fila, column=2).value = "SI"
             if isinstance(row["Precio"], (int, float)):
-                sheet_calc.cell(row=base_row_calc, column=3).value = row["Precio"]
+                sheet_calc.cell(row=fila, column=3).value = row["Precio"]
+
+            # Formulas corregidas y dinámicas
+            sheet_calc.cell(row=fila, column=6).value = f"=D{fila}-E{fila}"  # F
+            sheet_calc.cell(row=fila, column=7).value = f"=F{fila}/D{fila}"  # G
+            sheet_calc.cell(row=fila, column=8).value = f'=MAX(BUSCARX(A{fila},'Alta de productos'!B:B,'Alta de productos'!G:G,"no hay peso",0,1),BUSCARX(A{fila},Tabla44[Nombre del Articulo],Tabla44[cubicaje m3],"No hay",0,1))'  # H
+            sheet_calc.cell(row=fila, column=11).value = f"=SI(H{fila}=0,0,J{fila}/H{fila})"  # K
+            sheet_calc.cell(row=fila, column=12).value = f"=C{fila}*M{fila}"  # L
 
         output = BytesIO()
         wb.save(output)
